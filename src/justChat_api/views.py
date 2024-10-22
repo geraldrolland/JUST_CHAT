@@ -37,6 +37,7 @@ from rest_framework.views import APIView
 from .serializer import AuthSerializer
 from django.db.models import Q
 from .format_date import FormatDate
+from django.core.cache import cache
 channel_layer = get_channel_layer()
 #from .formatdate import FormatDate
 # Create your views here.
@@ -46,29 +47,56 @@ class UserViewSet(viewsets.ViewSet):
     
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def create_user(self, request):
-        serializer = CustomUserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        user = CustomUser.objects.get(email=request.data.get("email"))
+        """
+
+        This endpoint create user with a valid and verified credentials
+
+        Args:
+            self (object): the instance of the class
+            request (dict): a dictionary containing the request body
+        
+        Returns:
+            Response: the credentials of user
+
+        """
+        user_password = request.data.pop("password")
+        user = CustomUser.objects.create(**request.data)
+        user.set_password(user_password)
+        user.save()
         refresh = RefreshToken.for_user(user=user)
-        serializer.validated_data.update({
+        return Response({
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "profile_image": user.profile_image if user.profile_image else None,
             "refresh": str(refresh),
             "access": str(refresh.access_token),
-        })
-        return Response(serializer.validated_data, status=status.HTTP_201_CREATED)
+
+        }, status=status.HTTP_201_CREATED)
     
-    @action(detail=False, methods=["post"], permission_classes=[AllowAny])
+    @action(detail=False, methods=["post"], permission_classes=[AllowAny], )
     def verify_email(self, request):
+        """
+
+        This endpoint validate the verify the user email through a two factor authentication
+
+        Args:
+            self (object): instance of the class
+            request (object): a request that contains the body of request
+
+        Returns:
+            Response: 200 status code
+
+        Raises:
+            Bad Request: 400 status code 
+
+        """
         try:
             CustomUser.objects.get(email=request.data.get("email"))
             return Response({"error": "bad request"}, status=status.HTTP_400_BAD_REQUEST)
-        except CustomUser.DoesNotExist:
-            otp = random.randint(51011, 89630)  # Generate random OTP
-            request.session['otp'] = otp
-            request.session.save()
-            print(f"OTP saved in session: {request.session['otp']}")  # Debugging output
-
-            # Send OTP via email
+        except CustomUser.DoesNotExist as e:
+            otp = random.randint(51011, 89630)
+            cache.set(request.data.get("email"), value=otp, timeout=120)
             subject = "User Email Verification"
             html_content = f'''
                 <html><body> 
@@ -85,27 +113,50 @@ class UserViewSet(viewsets.ViewSet):
             email = EmailMessage(subject, html_content, mail_from, recipient)
             email.content_subtype = 'html'
             email.send(fail_silently=False)
-            print(request.session.get("otp"))
+            print(f"this is the first endpoint otp {cache.get(request.data.get("email"))}")
             return Response({"detail": "OTP created successfully"}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def verify_otp(self, request):
-        otp = request.session.get('otp', None)
-        print(f"Provided OTP: {request.data.get('otp')}")
-        print(f"Saved OTP: {otp}")  # Check what's retrieved
-        otp_code = request.data.get("otpCode")
-        saved_otp = request.session.get("otp")  # Retrieve OTP from session
+        """
 
-        print(f"Provided OTP: {otp_code}")
-        print(f"Saved OTP: {saved_otp}")
+        This endpoint verifies the otp code submitted using a post request
 
-        if otp_code and str(otp_code) == str(saved_otp):
+        Args:
+            self (object): This parameter is the  instance of the class
+            request (object): This parameter is request and contains  data about the request
+        
+        Returns:
+            Response: request accepted with 200 status code
+
+        Raises:
+            Not Acceptable: 406 status code, request not accepted 
+
+        """
+        otp_code = str(request.data.get("otpCode"))
+        print("this is the second end point", cache.get(request.data.get("email"))) 
+        if otp_code and otp_code == str(cache.get(request.data.get("email"), default=None)):
             response = Response({"detail": "OTP verified successfully"}, status=status.HTTP_200_OK)
             return response
         return Response({"detail": "Invalid OTP"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def login_user(self, request):
+        """
+
+        This end point logs in a user with a valid credential and returns user credentails including a refresh and access token for JWT authentication
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains data about the request
+        
+        Returns:
+            Response: request accepted with a status code of 200
+        
+        Raises:
+            Bad Request: bad request with a status code of 400
+
+        """
         user = get_object_or_404(CustomUser, email=request.data.get("email"))
         if user.check_password(request.data.get("password")):
             refresh = RefreshToken.for_user(user=user)
@@ -120,22 +171,199 @@ class UserViewSet(viewsets.ViewSet):
         return Response({"error": "bad request"}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"])
+
     def add_a_friend(self, request, pk=None):
+        """
+
+        This endpoint allows user to add friend using the provided id in the url
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contain data about the request
+            pk (int | str): this paramter is the contain the user's friend id
+        
+        Returns:
+            Response: request accepted with status code 200
+        
+        Raises:
+            Not Found: not found with a status code of 404
+        """
         friend = get_object_or_404(CustomUser, id=pk)
         user = get_object_or_404(CustomUser, email=request.user.get("email"))
         user.friends.add(friend)
         user.save()
         return Response({"detail": "friend added successfully"}, status=status.HTTP_200_OK)
     
-    @action(detail=False, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["post"])
-    def add_friend_to_group(self, request):
-        request.data.update({"author": request.user.id})
-        serializer = GroupSerialzer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"detail": "group created successfully"}, status=status.HTTP_200_OK)
+    @action(detail=False, permission_classes=[IsAuthenticated], authentication_classes=[SessionAuthentication, JWTAuthentication, BasicAuthentication], methods=["post"])
+    def create_group(self, request):
+        """
 
+        This endpoint allows the user to create a group
+
+        Args:
+            self (object): this paramter is the instance of the class
+            request (object): this paramter is the request object and contians data about the request
+        
+        Returns:
+            Response: resource created with a status code of 201
+
+        """
+        request.data.update({"author": request.user.id})
+        group = Group.objects.create(**request.data)
+        group.participants.add(request.user)
+        group.save()
+        is_group_admin_obj = {
+            "group": group.group_id,
+            "IsGroupAdmin": True,
+            "user": request.user.id,
+        }
+        is_group_admin_obj = IsGroupAdmin.objects.create(**is_group_admin_obj)
+        is_group_admin_obj.save()
+        return Response({"detail": "group created succesfully"}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["post"])
+    def add_friend_to_group(self, request, pk=None):
+        """
+
+        This endpoint allows user to add a friend to group
+
+        Args:
+            self (object): this paramter is the instance of the class
+            request (object): this paramter is the request object and contains data about the request
+            pk (int | str): this paramter contains the id of the group
+        Returns:
+            Response: resource created successfully with a status of 201
+        
+        Raises:
+            Not Found: resource not found with status of code of 404
+
+        """
+        group = get_object_or_404(Group, group_id=pk)
+        for friend in request.data:
+            friend = get_object_or_404(CustomUser, id=friend[id])
+            try:
+                IsGroupAdmin.objects.filter(user=friend.id, group=group.group_id)
+                continue
+            except IsGroupAdmin.DoesNotExist as e:
+                is_group_admin_obj = {
+                "group": group.group_id,
+                "user": friend.id,
+                }
+                is_group_admin_obj = IsGroupAdmin.objects.create(**is_group_admin_obj)
+                is_group_admin_obj.save()
+                group.participants.add(friend)
+            group.save()
+        return Response({"detail": "friends added to group successfully"}, status=status.HTTP_201_CREATED)
     
+    @action(detail=True, authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], permission_classes=[IsAuthenticated], methods=["get"])
+    def user_exit_group(self, request, pk=None):
+        """
+
+        This endpoint allow user to exist a group
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains data about the request
+            pk (int | str): this paramter contain the id of the group
+        
+        Return:
+            Response: request accepted with a status code of 200
+        
+        Raises:
+            Not Found: resource not found with a status code of 404
+
+        """
+        group = get_object_or_404(Group, group_id=pk)
+        is_group_admin = IsGroupAdmin.objects.get(group=group.group_id, user=request.user.id)
+        is_group_admin.delete()
+        is_group_admin.save()
+        group.participants.remove(request.user)
+        group.save()
+        return Response({"detail": "exited group succcesfully"}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], permission_classes=[IsAuthenticated], methods=["post"])
+    def make_friend_group_admin(self, request, pk=None):
+        """
+
+        This endpoint allow user with group admin privilege to grant friend group admin privilege
+
+        Args:
+            self (object): this paramter is the instance of the class
+            request (object): this paramter is the request object and contains data about the request
+            pk (int | str): this parameter contains the id of the group
+
+        Return:
+            Response: request accepted with a status code 200
+
+        Raises:
+            Not Found: resource not found with a status code 
+            Permission Denied: permission denied with a status code of 403 
+
+        """
+        friend = get_object_or_404(CustomUser, id=request.data.get("id"))
+        group = get_object_or_404(Group, group_id=pk)
+        try:
+            is_group_admin = IsGroupAdmin.objects(group=group.group_id, user=request.user.id)
+            if is_group_admin.IsGroupAdmin == True:
+                is_group_admin = IsGroupAdmin.objects.get(group=group.group_id, user=friend.id)
+                if is_group_admin.IsGroupAdmin != True:
+                    is_group_admin.IsGroupAdmin = True
+                is_group_admin.save()
+                return Response({"detail": "grant friend group admin privelegs succefully"}, status=status.HTTP_200_OK)
+            return Response({"error": "permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        except IsGroupAdmin.DoesNotExist as e:
+            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[SessionAuthentication, BasicAuthentication, JWTAuthentication], methods=["post"])
+    def revoke_friend_group_admin(self, request, pk=None):
+        """
+
+        This endpoint allow user with group admin privilege to revoke friend group admin privilege
+
+        Args:
+            self (object): this paramter is the instance of the class
+            request (object): this paramter is the request object and contains data about the request
+            pk (int | str): this parameter contains the id of the group
+
+        Return:
+            Response: request accepted with a status code 200
+
+        Raises:
+            Not Found: resource not found with a status code 
+            Permission Denied: permission denied with a status code of 403 
+
+        """
+        friend = get_object_or_404(CustomUser, id=request.data.get("id"))
+        group = get_object_or_404(Group, group_id=pk)
+        try:
+            is_group_admin = IsGroupAdmin.objects(group=group.group_id, user=request.user.id)
+            if is_group_admin.IsGroupAdmin == True:
+                is_group_admin = IsGroupAdmin.objects.get(group=group.group_id, user=friend.id)
+                if is_group_admin.IsGroupAdmin != False:
+                    is_group_admin.IsGroupAdmin = False
+                is_group_admin.save()
+                return Response({"detail": "revoked friend group admin privileges succefully"}, status=status.HTTP_200_OK)
+            return Response({"error": "permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        except IsGroupAdmin.DoesNotExist as e:
+            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"])
+    def get_group_participant(self, request, pk=None):
+        group = get_object_or_404(Group, group_id=pk)
+        if group.participants.all():
+            participant_list = []
+            for participant in group.participants.all():
+                is_group_admin = Group.objects.get(group=group.group_id, user=participant.id)
+                participant_obj = {
+                    "id": participant.id,
+                    "username": participant.username,
+                    "profile_image": participant.profile_image if participant.profile_image else None,
+                    "is_group_admin": is_group_admin.IsGroupAdmin,
+                }
+                participant_list.append(participant_obj)
+            return Response(participant_list, status=status.HTTP_200_OK)
+        return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication])
     def get_friends(self, request):
         user = get_object_or_404(CustomUser, email=request.user.get("email"))
@@ -193,7 +421,6 @@ class UserViewSet(viewsets.ViewSet):
                         "created_at": FormatDate.format_date(last_group_msg.created_at)
                     }
                 }
-
                 group_list.append(group_obj)
             return Response(group_list, status=status.HTTP_200_OK)
         return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -247,9 +474,6 @@ class UserViewSet(viewsets.ViewSet):
                 group_message_list.append(group_msg_obj)
             return Response(group_message_list, status=status.HTTP_200_OK)
         return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        
-    
     
     @staticmethod
     def otp_hash_algo(otp):
@@ -309,6 +533,5 @@ class GoogleAuthViewSet(viewsets.ViewSet):
             "refresh": str(refresh),
             "access": str(refresh.access_token),
         }, status=status.HTTP_200_OK)
-        #return redirect(settings.BASE_APP_URL)
         except KeyError as e:
             return redirect("http://localhost:5173/log-in")

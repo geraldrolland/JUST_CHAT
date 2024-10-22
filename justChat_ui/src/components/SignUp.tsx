@@ -49,6 +49,7 @@ const SignUp = () => {
 
   const handleSignUp = () => {
     if(validateUserdetails()) {
+      console.log("error")
       signUpButtonRef.current?.classList.remove("bg-green-500")
       signUpButtonRef.current?.classList.add("bg-green-300")
       setIsDisable(true)

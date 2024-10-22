@@ -31,16 +31,20 @@ export const OtpVarification = () => {
     buttonRef.current.classList.add("bg-green-300")
     return false
   }, [otpCode])
+
   const resendOtpCode = () => {
     const userDetails = JSON.parse(sessionStorage.getItem("userDetails")!)
     setisResendOtp(false)
     if (userDetails) {
-      axios.post("", {email: userDetails.email})
+      axios.post("http://127.0.0.1:8000/api/users/verify_email/", {email: userDetails.email})
       .catch((error) => {
         console.log(error)
       })
     }
   }
+
+
+  
 
   const verifyOtpcode = () => {
     if (validateInput()) {
@@ -48,17 +52,18 @@ export const OtpVarification = () => {
       setIsDisable(true)
       buttonRef.current.classList.remove("bg-green-500")
       buttonRef.current.classList.add("bg-green-300")
-      axios.post("http://127.0.0.1:8000/api/users/verify_otp/", {otpCode})
+      const userDetails: {username: string, email: string, password: string}  = JSON.parse(sessionStorage.getItem("userDetails")!)
+      axios.post("http://127.0.0.1:8000/api/users/verify_otp/", {otpCode, email: userDetails.email})
       .then(response => {
         if (response.status === 200) {
           const userDetails = JSON.parse(sessionStorage.getItem("userDetails")!)
           if (userDetails) {
-            axios.post("", userDetails)
+            axios.post("http://127.0.0.1:8000/api/users/create_user/", userDetails)
             .then(response => {
-              if (response.status === 200) {
+              if (response.status === 201) {
                 sessionStorage.setItem("userProfile", JSON.stringify(response.data))
                 sessionStorage.removeItem("userDetails")
-                naviagateToHome("/")
+                naviagateToHome("/home")
               }
             })
             .catch(error => {
@@ -68,7 +73,7 @@ export const OtpVarification = () => {
         }
       })
       .catch(error => {
-        if (error.response.status === 400) {
+        if (error.response.status === 406) {
           setisIncorrectotpCode(true)
         }
         setIsDisable(false)

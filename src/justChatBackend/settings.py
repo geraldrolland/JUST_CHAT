@@ -62,7 +62,6 @@ BASE_APP_URL = "http://localhost:5173/home"
 BASE_API_URL = "http://localhost:8000"
 
 
-
 # SMTP GMAIL CONFIGURATION
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
@@ -86,7 +85,7 @@ CORS_ALLOWED_ORIGINS = [
 "http://192.168.84.48:5173"
 ]
 
-SESSION_COOKIE_AGE = 3600  # 2 minutes
+#SESSION_COOKIE_AGE = 3600  # 2 minutes
 
 TEMPLATES = [
     {
@@ -178,10 +177,13 @@ STATIC_ROOT = BASE_DIR / 'django_static'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CACHES =  {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATIONS": "redis://127.0.0.1:6379"
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/0',  # Adjust the IP and port if necessary
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
     }
 }
 
@@ -209,7 +211,7 @@ SESSION_COOKIE_SECURE = False  # Set to True if using HTTPS in production
 SESSION_COOKIE_HTTPONLY = True  # Ensures JavaScript can't access the session cookie
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Sessions persist after browser close
 SESSION_SAVE_EVERY_REQUEST = True  # Save the session on every request (keeps it active)
-SESSION_COOKIE_SAMESITE = None
+#SESSION_COOKIE_SAMESITE = None
 
 """
 LOGGING = {

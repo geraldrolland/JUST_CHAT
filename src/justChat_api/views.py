@@ -19,7 +19,7 @@ from .custompermissions import *
 import random
 from django.core.mail import send_mail
 from django.conf import settings
-from django.core.mail import EmailMessage
+
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import JsonResponse
 import requests
@@ -38,6 +38,7 @@ from .serializer import AuthSerializer
 from django.db.models import Q
 from .format_date import FormatDate
 from django.core.cache import cache
+from .tasks import send_user_otp
 channel_layer = get_channel_layer()
 #from .formatdate import FormatDate
 # Create your views here.
@@ -110,9 +111,7 @@ class UserViewSet(viewsets.ViewSet):
             '''
             mail_from = settings.EMAIL_HOST_USER
             recipient = [request.data.get("email")]
-            email = EmailMessage(subject, html_content, mail_from, recipient)
-            email.content_subtype = 'html'
-            email.send(fail_silently=False)
+            send_user_otp(subject, html_content, mail_from, recipient)
             print(f"this is the first endpoint otp {cache.get(request.data.get("email"))}")
             return Response({"detail": "OTP created successfully"}, status=status.HTTP_200_OK)
 
@@ -144,7 +143,8 @@ class UserViewSet(viewsets.ViewSet):
     def login_user(self, request):
         """
 
-        This end point logs in a user with a valid credential and returns user credentails including a refresh and access token for JWT authentication
+        This end point logs in a user with a valid credential and returns 
+        user credentails including a refresh and access token for JWT authentication
 
         Args:
             self (object): this parameter is the instance of the class
@@ -202,7 +202,7 @@ class UserViewSet(viewsets.ViewSet):
 
         Args:
             self (object): this paramter is the instance of the class
-            request (object): this paramter is the request object and contians data about the request
+            request (object): this paramter is the request object and contains data about the request
         
         Returns:
             Response: resource created with a status code of 201
@@ -219,7 +219,11 @@ class UserViewSet(viewsets.ViewSet):
         }
         is_group_admin_obj = IsGroupAdmin.objects.create(**is_group_admin_obj)
         is_group_admin_obj.save()
-        return Response({"detail": "group created succesfully"}, status=status.HTTP_201_CREATED)
+        return Response({
+            "group_id": group.group_id,
+            "name": group.group_name,
+            "group_photo": group.group_photo,
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["post"])
     def add_friend_to_group(self, request, pk=None):
@@ -309,7 +313,7 @@ class UserViewSet(viewsets.ViewSet):
                 if is_group_admin.IsGroupAdmin != True:
                     is_group_admin.IsGroupAdmin = True
                 is_group_admin.save()
-                return Response({"detail": "grant friend group admin privelegs succefully"}, status=status.HTTP_200_OK)
+                return Response({"detail": "grant friend group admin privileges succefully"}, status=status.HTTP_200_OK)
             return Response({"error": "permission denied"}, status=status.HTTP_403_FORBIDDEN)
         except IsGroupAdmin.DoesNotExist as e:
             return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -349,6 +353,22 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"])
     def get_group_participant(self, request, pk=None):
+        """
+
+        This end point retreives all participants in a group
+
+        Args:
+            self (object): this paramter is the instance of the class
+            request (object): this parameter is the request object and contains the request data
+            pk (str | int): this paramter is the id of group
+        
+        Return:
+            Response: the list of participant with status code 200
+        
+        Raises:
+            Not Found: not found with a status code 404
+
+        """
         group = get_object_or_404(Group, group_id=pk)
         if group.participants.all():
             participant_list = []
@@ -366,6 +386,21 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication])
     def get_friends(self, request):
+        """
+
+        This end point retrieves users friends and their last recorded message
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains data about the request
+        
+        Returns:
+            Response: returns a list of users friends with a status code of 200
+        
+        Raises:
+            Not Found: resource not found with status code of 404
+
+        """
         user = get_object_or_404(CustomUser, email=request.user.get("email"))
         user_friends = user.friends.all()
         if user_friends:
@@ -399,6 +434,21 @@ class UserViewSet(viewsets.ViewSet):
     
     @action(detail=False, authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"], permission_classes=[IsAuthenticated])
     def get_groups(self, request):
+        """
+
+        This end point retrieves users groups
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains the data obout the request
+        
+        Return:
+            Response: returns the list of users group with a status code of 200
+        
+        Raises:
+            Not Found: resource not found with a status code of 404
+
+        """
         user = get_object_or_404(CustomUser, email=request.user.get("email"))
         user_groups = user.all_groups.all()
         if user_groups:
@@ -433,8 +483,9 @@ class UserViewSet(viewsets.ViewSet):
         if messages:
             message_list = []
             for message in messages:
-                message.is_receipient_online = True if message.receipient.is_online == True and message.receipient.id == friend.id else False
-                message.save()
+                if message.receipient.is_online == True and message.receipient.id == friend.id:
+                    message.is_receipient_online = True
+                    message.save()
                 message_obj = {
                     "message_id": message.message_id,
                     "image": message.image if message.image else None,
@@ -474,6 +525,10 @@ class UserViewSet(viewsets.ViewSet):
                 group_message_list.append(group_msg_obj)
             return Response(group_message_list, status=status.HTTP_200_OK)
         return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, permission_classes=[AllowAny], methods=["get"])
+    def check_limit(self, request):
+        return Response({"detail": "ok"}, status=status.HTTP_200_OK)
     
     @staticmethod
     def otp_hash_algo(otp):

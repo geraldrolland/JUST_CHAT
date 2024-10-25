@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'daphne',
     'channels',
+    'celery',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    #'justChat_api.customemiddleware.IpLimiterMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -73,6 +75,9 @@ EMAIL_HOST_PASSWORD =  'gmbj vyce ixpn gyrn '
 
 
 
+
+
+
 # CORS CONFIGURATION
 CORS_ALLOW_CREDENTIALS = True
 AUTH_USER_MODEL = 'justChat_api.CustomUser'
@@ -84,6 +89,32 @@ CORS_ALLOWED_ORIGINS = [
 "http://192.168.82.48:5173",
 "http://192.168.84.48:5173"
 ]
+
+
+# justChatBackend/settings.py
+
+from kombu import Queue
+
+CELERY_TASK_QUEUES = (
+    Queue('high_priority', routing_key='high_priority'),
+    Queue('medium_priority', routing_key='medium_priority'),
+    Queue('low_priority', routing_key='low_priority'),
+)
+
+CELERY_TASK_DEFAULT_QUEUE = 'low_priority'
+CELERY_TASK_ROUTES = {
+    'justChatBackend.tasks.send_user_otp': {'queue': 'high_priority'},
+    'justChatBackend.tasks.medium_priority_task': {'queue': 'medium_priority'},
+    'justChatBackend.tasks.low_priority_task': {'queue': 'low_priority'},
+}
+
+
+
+#Configuration for celery with Redis broker
+
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 #SESSION_COOKIE_AGE = 3600  # 2 minutes
 

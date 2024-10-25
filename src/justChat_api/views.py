@@ -477,6 +477,21 @@ class UserViewSet(viewsets.ViewSet):
     
     @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, BasicAuthentication, SessionAuthentication])
     def get_user_and_frnd_msgs(self, request, pk=None):
+        """
+        THis endpoint retrieves user and friend messages
+
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains the the request data
+            pk: this parameter is the user's friend id
+        
+        Return:
+            Response: returns a list  of message dictionary with a status code of 200
+
+        Raises:
+            Not Found: resource not found with status code of 404
+
+        """
         friend = get_object_or_404(CustomUser, id=pk)
         user = get_object_or_404(CustomUser, email=request.user.get("email"))
         messages = Message.objects.filter(Q(sender=friend.id, receipient=user.id) | Q(sender=user.id, receipient=friend.id)).order_by("created_at")
@@ -503,6 +518,21 @@ class UserViewSet(viewsets.ViewSet):
     
     @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"])
     def get_user_and_group_msgs(self, request, pk=None):
+        """
+        This endpoint retrieves user and group messages
+
+        Args:
+            self (obejct): this is the instance of the class
+            request (object): this parameter is the request object and contains the data of the request
+            pk (int | str): this paramter is the id of the group
+        
+        
+        Return:
+            Response: returns a list of dictionary of messages with a status code of 200
+        
+        Raises:
+            Not Found: resource not found with a status code of 404
+        """
         group = get_object_or_404(Group, group_id=pk)
         group_messages = group.messages.all()
         if group_messages:

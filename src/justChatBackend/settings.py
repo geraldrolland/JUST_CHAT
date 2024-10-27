@@ -73,8 +73,7 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'geraldrolland123456@gmail.com'
 EMAIL_HOST_PASSWORD =  'gmbj vyce ixpn gyrn '
 
-GOOGLE_OAUTH2_CLIENT_ID = "647424373109-0cs76iiqksock5rg4pk5mblebeik91cm.apps.googleusercontent.com"
-GOOGLE_OAUTH2_CLIENT_SECRET = "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"
+
 
 
 

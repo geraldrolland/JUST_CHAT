@@ -50,13 +50,7 @@ const MessageBox = () => {
         <div   className="w-[100%] md:w-[90%] ld:w-[100%] mx-auto  max-h-[100%] relative tab-container overflow-y-auto">
         <div id="message-container" className="md:w-[100%] ld:w-[100%]  relative ">
         <Message/>
-        <Message/>
-        <Message/>
-        <Message/>
-        <Message/>
-        <Message/>
-        <Message/>
-        <Message/>
+
         <div ref={messageBoxRef}  id="padding" className="w-[100%] h-[60px]"></div>
       </div>
       </div>

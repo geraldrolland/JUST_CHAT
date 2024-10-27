@@ -60,21 +60,28 @@ class UserViewSet(viewsets.ViewSet):
             Response: the credentials of user
 
         """
-        user_password = request.data.pop("password")
-        user = CustomUser.objects.create(**request.data)
-        user.set_password(user_password)
-        user.save()
-        refresh = RefreshToken.for_user(user=user)
-        return Response({
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "profile_image": user.profile_image if user.profile_image else None,
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
+        if cache.get(request.data.get("email"), default=None) is not None:
+            email_verified = json.loads(cache.get(request.data.get("email")))
+            if email_verified.get("is_email_verified") == True:
+                user_password = request.data.pop("password")
+                request.data.update(email_verified)
+                cache.delete(request.data.get("email"))
+                user = CustomUser.objects.create(**request.data)
+                user.set_password(user_password)
+                user.save()
+                refresh = RefreshToken.for_user(user=user)
+                return Response({
+                    "id": user.id,
+                    "email": user.email,
+                    "username": user.username,
+                    "profile_image": user.profile_image if user.profile_image else None,
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
 
-        }, status=status.HTTP_201_CREATED)
-    
+                }, status=status.HTTP_201_CREATED)
+            return Response({"error": "permission denied invalid or unverified email"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"error": "bad request"}, status=status.HTTP_400_BAD_REQUEST)
+        
     @action(detail=False, methods=["post"], permission_classes=[AllowAny], )
     def verify_email(self, request):
         """
@@ -135,6 +142,7 @@ class UserViewSet(viewsets.ViewSet):
         otp_code = str(request.data.get("otpCode"))
         print("this is the second end point", cache.get(request.data.get("email"))) 
         if otp_code and otp_code == str(cache.get(request.data.get("email"), default=None)):
+            cache.set(request.data.get("email"), json.dumps({"is_email_verified": True}))
             response = Response({"detail": "OTP verified successfully"}, status=status.HTTP_200_OK)
             return response
         return Response({"detail": "Invalid OTP"}, status=status.HTTP_406_NOT_ACCEPTABLE)

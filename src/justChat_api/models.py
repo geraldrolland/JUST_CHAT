@@ -25,6 +25,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     last_date_online = models.DateTimeField(null=True, blank=True)
     channel_name = models.CharField(max_length=256, null=True, blank=True)
     is_channel_busy = models.BooleanField(null=True, blank=True, default=False)
+    is_email_verified = models.BooleanField(null=False, default=False)
 
 
     USERNAME_FIELD = "email"

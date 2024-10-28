@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router"
-import { useContext, useEffect, useState } from "react"
+import { useContext, useEffect} from "react"
 import { hideContext } from "./Home"
 import pic from "../assets/images/git_img.png"
 import { BsTelephone } from "react-icons/bs";
@@ -9,20 +9,52 @@ import Message from "./Message";
 import "../style.css"
 import TextInput from "./TextInput";
 import { useRef } from "react";
-
+import useStore from "./customhooks/UseStore";
+import UseRequest from "./customhooks/UseRequest";
 const MessageBox = () => {
 
   const messageBoxRef = useRef<HTMLDivElement>(null!)
   const navigateToHome = useNavigate()
   const {hideMessageBox} = useContext(hideContext)
   const params = useParams()
-  const [amount, setAmount] = useState(60)
-
+  const setMessageWebsocket = useStore(state => state.setMessageWebsocket)
+  const response = UseRequest(`http://127.0.0.1:8000/api/users/${params.userId}/get_user_and_frnd_msgs/`, "get", "messages")
   const navigateHome = () => {
     navigateToHome("/home")
     hideMessageBox()
   }
 
+  useEffect(() => {
+    console.log("params.id", params)
+    const userStatus = JSON.parse(sessionStorage.getItem("userProfile")!)
+    const access = userStatus.access
+    if (params.userId) {
+      const messageWebsocket = new WebSocket(`ws://localhost:8000/ws/chat/${params.userId}/?access=${access}`);
+      messageWebsocket.onopen = () => {
+        console.log("connected successfully")
+      }
+  
+      messageWebsocket.onerror = () => {
+        console.log("something went wrong")
+      }
+  
+      messageWebsocket.onmessage = (e) => {
+        const message = JSON.parse(e.data)
+        if (message) {
+          response?.data.push(message.message)
+        }
+      }
+  
+      messageWebsocket.onclose = () => {
+        console.log("connection closed successfully")
+      }
+  
+      setMessageWebsocket(messageWebsocket)
+    }
+
+
+
+  }, [response?.data])
 
 
 
@@ -54,7 +86,7 @@ const MessageBox = () => {
         <div ref={messageBoxRef}  id="padding" className="w-[100%] h-[60px]"></div>
       </div>
       </div>
-      <TextInput boxRef={messageBoxRef.current} setAmount={setAmount} amount={amount} />
+      <TextInput boxRef={messageBoxRef.current} />
       </div>
 
     </div>

@@ -1,21 +1,21 @@
 import { TiMicrophone } from "react-icons/ti";
 import { IoSendSharp } from "react-icons/io5";
-import React, { TextareaHTMLAttributes, useRef, useState } from "react"
+import React, {useRef} from "react"
 import "../style.css"
 import { CiFaceSmile } from "react-icons/ci";
 import { CiCamera } from "react-icons/ci";
 import { GiPaperClip } from "react-icons/gi";
+import useStore from "./customhooks/UseStore";
 type propType ={
   boxRef: HTMLDivElement,
-  setAmount: (amount: number | ((prevAmount: number) => number)) => void,
-  amount: number,
 }
 
-const TextInput = ({boxRef, setAmount, amount}: propType) => {
-  const [isRender, setIsRender] = useState(false)
+const TextInput = ({boxRef}: propType) => {
+
   const sendRef = useRef<HTMLButtonElement>(null!)
   const micRef = useRef<HTMLButtonElement>(null!)
   const smileCamRef = useRef<HTMLDivElement>(null!)
+  const messageWebsocket = useStore(state => state.messageWebsocket)
 
   const expandInputHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     console.log(e.target.offsetHeight)
@@ -31,7 +31,7 @@ const TextInput = ({boxRef, setAmount, amount}: propType) => {
       e.target.style.height = `${e.target.scrollHeight}px`
     }
 
-    if (e.target.value !== "") {
+    if (e.target.value.trim() !== "") {
       micRef.current.classList.remove("flex")
       micRef.current.classList.add("hidden")
       sendRef.current.classList.remove("hidden")
@@ -46,8 +46,6 @@ const TextInput = ({boxRef, setAmount, amount}: propType) => {
       smileCamRef.current.classList.remove("translate-x-[35px]")
       smileCamRef.current.classList.add("translate-x-[0]")
     }
-
-    setIsRender(!isRender)
 
   }
 

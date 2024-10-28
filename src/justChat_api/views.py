@@ -68,6 +68,7 @@ class UserViewSet(viewsets.ViewSet):
                 cache.delete(request.data.get("email"))
                 user = CustomUser.objects.create(**request.data)
                 user.set_password(user_password)
+                user.is_online = True
                 user.save()
                 refresh = RefreshToken.for_user(user=user)
                 return Response({
@@ -166,7 +167,10 @@ class UserViewSet(viewsets.ViewSet):
 
         """
         user = get_object_or_404(CustomUser, email=request.data.get("email"))
+
         if user.check_password(request.data.get("password")):
+            user.is_online = True
+            user.save()
             refresh = RefreshToken.for_user(user=user)
             return Response({
                 "id": user.id,
@@ -409,22 +413,23 @@ class UserViewSet(viewsets.ViewSet):
             Not Found: resource not found with status code of 404
 
         """
-        user = get_object_or_404(CustomUser, email=request.user.get("email"))
-        user_friends = user.friends.all()
+        user = get_object_or_404(CustomUser, email=request.user.email)
+        user_friends = CustomUser.objects.all().exclude(id=user.id) #user.friends.all()
         if user_friends:
             friend_list = []
             for friend in user_friends:
                 user_and_friend_msg = Message.objects.filter(Q(sender=user.id, receipient=friend.id) | Q(sender=friend.id, receipient=user.id)).order_by("created_at")
-                user_and_friend_last_msg = user_and_friend_msg[-1]
-                user_and_friend_last_msg.is_receipient_online = True if user_and_friend_last_msg.receipient.id == friend.id and friend.is_online == True else False
-                user_and_friend_last_msg.save()
+                user_and_friend_last_msg = user_and_friend_msg[len(user_and_friend_msg) - 1] if user_and_friend_msg else None
+                if user_and_friend_last_msg is not None:
+                    user_and_friend_last_msg.is_receipient_online = True if user_and_friend_last_msg.receipient.id == friend.id and friend.is_online == True else False
+                    user_and_friend_last_msg.save()
                 friend_obj = {
                     "id": friend.id,
                     "username": friend.username,
                     "profile_image": friend.profile_image if friend.profile_image else None,
                     "is_online": friend.is_online,
                     "last_date_online": friend.last_date_online,
-                    "last_message": {
+                    "last_message":  {
                         "message_id": user_and_friend_last_msg.messageId,
                         "sender_username": user_and_friend_last_msg.sender.username,
                         "sender_id": user_and_friend_last_msg.sender.id,
@@ -434,7 +439,7 @@ class UserViewSet(viewsets.ViewSet):
                         "text": user_and_friend_last_msg.text if user_and_friend_last_msg.text else None,
                         "created_at": FormatDate.format_date(user_and_friend_last_msg.created_at),
                         "is_receipient_online": user_and_friend_last_msg.is_receipient_online
-                    }
+                    } if user_and_friend_last_msg is not None else None
                 }
                 friend_list.append(friend_obj)
             return Response(friend_list, status=status.HTTP_200_OK)
@@ -457,7 +462,7 @@ class UserViewSet(viewsets.ViewSet):
             Not Found: resource not found with a status code of 404
 
         """
-        user = get_object_or_404(CustomUser, email=request.user.get("email"))
+        user = get_object_or_404(CustomUser, email=request.user.email)
         user_groups = user.all_groups.all()
         if user_groups:
             group_list = []
@@ -500,13 +505,14 @@ class UserViewSet(viewsets.ViewSet):
             Not Found: resource not found with status code of 404
 
         """
+        print("this is ")
         friend = get_object_or_404(CustomUser, id=pk)
-        user = get_object_or_404(CustomUser, email=request.user.get("email"))
+        user = get_object_or_404(CustomUser, email=request.user.email)
         messages = Message.objects.filter(Q(sender=friend.id, receipient=user.id) | Q(sender=user.id, receipient=friend.id)).order_by("created_at")
         if messages:
             message_list = []
             for message in messages:
-                if message.receipient.is_online == True and message.receipient.id == friend.id:
+                if message.receipient == user.id:
                     message.is_receipient_online = True
                     message.save()
                 message_obj = {
@@ -522,7 +528,7 @@ class UserViewSet(viewsets.ViewSet):
                 }
                 message_list.append(message_obj)
             return Response(message_list, status=status.HTTP_200_OK)
-        return Response({"error": "not found"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["get"])
     def get_user_and_group_msgs(self, request, pk=None):

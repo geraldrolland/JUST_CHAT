@@ -10,7 +10,7 @@ import ChangePassword from './components/ChangePassword'
 import Home from './components/Home'
 import MessageBox from './components/MessageBox'
 
-const queryClient = new QueryClient()
+export const queryClient = new QueryClient()
 function App() {
 
   useEffect(() => {
@@ -28,8 +28,8 @@ function App() {
           <Route path='/forgot-password' element={<EmailVarification/>} />
           <Route path='/otp-verification' element={<OtpVarification/>} />
           <Route path='/change-password' element={<ChangePassword/>} /> 
-          <Route path='/home' element={<Home/>}>
-          <Route path=':userId' element={<MessageBox/>} />
+          <Route path='/home/' element={<Home/>}>
+          <Route path='friend/:userId' element={<MessageBox/>} />
           </Route>
         </Routes>
       </QueryClientProvider>

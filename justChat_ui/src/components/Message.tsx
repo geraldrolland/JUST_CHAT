@@ -21,7 +21,7 @@ const Message = () => {
     <p ref={textParaRef} className="text-wrap px-2 w-[100%] rounded-md py-2 border  break-words text-[14px] md:text-[15px] text-gray-800 font-noto">hi00000000000000000000000000000000000000000000000000000000000
     </p>
     <div className="w-[110px] justify-start px-3 items-center h-[15px]  mt-[2px] relative flex">
-      <div className="absolute -left-1 -top-[1px] w-[10px] bg-gray-300 h-[10px] rounded-full"></div>
+      <div className="absolute  -left-1 -top-[1px] w-[10px] bg-gray-300 h-[10px] rounded-full"></div>
       <p className="font-thin text-gray-700 text-[10px]">Wed, 10.30 pm</p>
       <div className="absolute -right-1 -top-[1px] w-[10px] bg-purple-500 h-[10px] rounded-full "></div>
     </div>

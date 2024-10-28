@@ -49,7 +49,7 @@ class Group(models.Model):
 class Message(models.Model):
     message_id = models.CharField(primary_key=True, max_length=124, editable=False, null=False, default=str(uuid.uuid4))
     created_at = models.DateTimeField(default=datetime.now, null=False, editable=False)
-    text = models.TextField()
+    text = models.TextField(null=True, blank=True)
     image = models.TextField(null=True, blank=True)
     video = models.TextField(null=True, blank=True)
     audio = models.TextField(null=True, blank=True)

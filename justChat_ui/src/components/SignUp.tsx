@@ -33,7 +33,7 @@ const SignUp = () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*[\W_])[A-Za-z\d\W_]{8,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (usernameRef.current?.value !== "" && emailRegex.test(emailRef.current.value) === true && passwordRegex.test(passwordRef.current.value) === true) {
+    if (usernameRef.current?.value.trim() !== "" && emailRegex.test(emailRef.current.value) === true && passwordRegex.test(passwordRef.current.value) === true) {
       signUpButtonRef.current?.classList.remove("bg-green-300")
       signUpButtonRef.current?.classList.add("bg-green-500")
       setIsDisable(false)

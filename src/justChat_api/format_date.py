@@ -47,15 +47,12 @@ class FormatDate:
 
         if datetime.now().year == date.year:
             if datetime.now().day == date.day and datetime.now().month == date.month:
-                return f"Today, {time_map[str(date.hour)][0]}:{date.minute} {time_map[str(date.hour)][1]}"
+                return f"Today, {time_map[str(date.hour)][0]}.{date.minute} {time_map[str(date.hour)][1]}"
             elif date.day == datetime.now().day - 1 and datetime.now().month == date.month:
-                return f"Yesterday, {time_map[str(date.hour)][0]}:{date.minute} {time_map[str(date.hour)][1]}"
-
+                return f"Yesterday, {time_map[str(date.hour)][0]}.{date.minute} {time_map[str(date.hour)][1]}"
+            elif date.day < datetime.now().day - 1 and date.day > datetime.now().day - 7 and datetime.now().month == date.month:
+                return f"{date.day.strftime("A%")}, {time_map[str(date.hour)][0]}.{time_map[str(date.hour)][1]}"
             else:
-                return f"{month_map[str(date.month)]} {date.day}, {time_map[str(date.hour)][0]}:{date.minute} {time_map[str(date.hour)][1]}"
+                return f"{date.day}/{date.month}/{date.year}, {time_map[str(date.hour)][0]}.{time_map[str(date.hour)][1]}"
         else:
-            return f"{month_map[str(date.month)]} {date.day}, {date.year},  {time_map[str(date.hour)][0]}:{date.minute} {time_map[str(date.hour)][1]}"
-            
-
-
-    print(datetime.now().hour)
+            return f"{date.day}/{date.month}/{date.year}, {time_map[str(date.hour)][0]}.{date.minute} {time_map[str(date.hour)][1]}"

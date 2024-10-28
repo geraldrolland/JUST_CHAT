@@ -8,14 +8,33 @@ import { HiMagnifyingGlass } from "react-icons/hi2";
 import "../style.css"
 import Friend from "./Friend";
 import { Outlet } from "react-router";
-import React from "react";
-
+import React, { useEffect } from "react";
+import UseRequest from "./customhooks/UseRequest";
 type hideContextType = {
   hideMessageBox: () => void,
 }
+
+type friendType = {
+    id: string | undefined,
+    username: string,
+    profile_image: string | undefined,
+    is_online: boolean,
+    last_date_online: string,
+    last_message: {
+         message_id: string | number,
+        sender_username: string,
+        sender_id: string | number,
+        image: string | null,
+        video: string | null,
+        audio: string | null,
+        text: string | null,
+        created_at: string | null,
+        is_receipient_online: string | null
+    } | null
+}
 export const hideContext = React.createContext<hideContextType>(null!)
 const Home = () => {
-
+  const response = UseRequest("http://127.0.0.1:8000/api/users/get_friends/", "get", "friends")
   const showMessgaeBox = () => {
     const messageBox = document.getElementById("message-box")
     messageBox?.classList.add("z-30")
@@ -27,6 +46,11 @@ const Home = () => {
     messageBox?.classList.remove("z-30")
     messageBox?.classList.add("-z-10")
   }
+
+  useEffect(() => {
+    console.log("mounted")
+    console.log("this response", response?.data)
+  })
   return (
     <div className="lg:w-[1100px] w-screen   lg:shadow-md bg-opacity-50 backdrop-filter backdrop-blur-lg h-screen lg:h-[610px] flex justify-center items-center bg-[#BCF2F6] md:rounded-md">
    <div className="lg:w-[95%] lg:h-[95%] relative  w-[100%] h-[100%] flex justify-evenly items-center">
@@ -61,9 +85,14 @@ const Home = () => {
         </div>
       </div>
       <div className="w-[100%] h-[100%] tab-container overflow-y-auto scroll-smooth">
+        { response?.isSuccess ? 
         <div id="friends-container" className="flex flex-col w-[100%] pt-[55px] transition-all duration-300">
-          <Friend showMessageBox={showMessgaeBox} />
-        </div>
+          {
+            response?.data?.map((friend: friendType)  => <Friend key={friend.id} friend={friend} showMessageBox={showMessgaeBox} />)
+          }
+        </div> : null
+        }
+
       </div>
     </div>
     <div id="message-box" className="lg:w-[550px] lg:shadow-md ld:w-[54%] h-[100%] absolute -z-10 w-[100%]  top-0 right-0 ld:static ld:flex  lg:rounded-[15px] bg-[#ffff]">

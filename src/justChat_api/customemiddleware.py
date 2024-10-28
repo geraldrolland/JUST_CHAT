@@ -20,3 +20,61 @@ def IpLimiterMiddleware(get_response):
              return JsonResponse({"error": "forbidden request"}, status=status.HTTP_403_FORBIDDEN)
         return get_response(request)
     return ip_limiter
+
+"""
+# myapp/middleware.py
+import jwt
+from .models import CustomUser
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
+from channels.db import database_sync_to_async
+
+
+
+@database_sync_to_async
+def get_user_from_token(token):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        return CustomUser.objects.get(id=user_id)
+    except (jwt.ExpiredSignatureError, jwt.DecodeError, CustomUser.DoesNotExist):
+        return AnonymousUser()
+
+async def JWTAuthMiddleware(inner):
+    async def middleware(scope, receive, send):
+        token = dict(scope["headers"]).get(b"authorization", b"").decode("utf-8")
+        if token.startswith("Bearer "):
+            token = token[7:]
+        scope["user"] = await get_user_from_token(token)
+        return await inner(scope, receive, send)
+    return middleware
+
+
+"""
+
+
+from django.contrib.auth.models import AnonymousUser
+from channels.db import database_sync_to_async
+import jwt
+from django.conf import settings
+from .models import CustomUser
+@database_sync_to_async
+def get_user_from_token(token):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        return CustomUser.objects.get(id=user_id)
+    except (jwt.ExpiredSignatureError, jwt.DecodeError, CustomUser.DoesNotExist):
+        return AnonymousUser()
+
+class JWTAuthMiddleware:
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        query_params = scope.get("query_string").decode("utf-8")
+        token = query_params.split("=")[1]
+        scope["user"] = await get_user_from_token(token)
+        return await self.inner(scope, receive, send)
+

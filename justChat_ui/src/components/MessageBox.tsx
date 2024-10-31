@@ -1,60 +1,57 @@
 import { useNavigate, useParams } from "react-router"
 import { useContext, useEffect} from "react"
 import { hideContext } from "./Home"
-import pic from "../assets/images/git_img.png"
+
 import { BsTelephone } from "react-icons/bs";
 import { BsCameraVideo } from "react-icons/bs";
 import { CiMenuKebab } from "react-icons/ci";
-import Message from "./Message";
 import "../style.css"
 import TextInput from "./TextInput";
 import { useRef } from "react";
 import useStore from "./customhooks/UseStore";
-import UseRequest from "./customhooks/UseRequest";
-const MessageBox = () => {
+import Message from "./Message";
 
+
+
+type messageType = {
+  text: string,
+  message_id: string,
+  created_at: string,
+  audio: string | null,
+  image: string | null,
+  video: string | null,
+  file: string | null,
+  sender?: string | number,
+  receipient?: string | number,
+
+}
+const MessageBox = () => {
+  const setScrollToLastMsg = useStore(state => state.setScrollToLastMsg)
   const messageBoxRef = useRef<HTMLDivElement>(null!)
   const navigateToHome = useNavigate()
   const {hideMessageBox} = useContext(hideContext)
   const params = useParams()
-  const setMessageWebsocket = useStore(state => state.setMessageWebsocket)
-  const response = UseRequest(`http://127.0.0.1:8000/api/users/${params.userId}/get_user_and_frnd_msgs/`, "get", "messages")
+
+  const messageContainerRef = useRef<HTMLDivElement>(null!)
+  const friendProfile = useStore(state => state.friendProfile)
+
+  const scrollToLastMsg = () => {
+    messageContainerRef.current.scrollIntoView({behavior: "smooth", block: "end"})
+  }
+
   const navigateHome = () => {
     navigateToHome("/home")
     hideMessageBox()
   }
 
   useEffect(() => {
-    console.log("params.id", params)
-    const userStatus = JSON.parse(sessionStorage.getItem("userProfile")!)
-    const access = userStatus.access
-    if (params.userId) {
-      const messageWebsocket = new WebSocket(`ws://localhost:8000/ws/chat/${params.userId}/?access=${access}`);
-      messageWebsocket.onopen = () => {
-        console.log("connected successfully")
-      }
-  
-      messageWebsocket.onerror = () => {
-        console.log("something went wrong")
-      }
-  
-      messageWebsocket.onmessage = (e) => {
-        const message = JSON.parse(e.data)
-        if (message) {
-          response?.data.push(message.message)
-        }
-      }
-  
-      messageWebsocket.onclose = () => {
-        console.log("connection closed successfully")
-      }
-  
-      setMessageWebsocket(messageWebsocket)
-    }
 
+    messageContainerRef.current.scrollIntoView({behavior:"smooth", block:"end"})
+    console.log("params", params.userId)
+    console.log("message", friendProfile?.messages)
+    setScrollToLastMsg(scrollToLastMsg)
 
-
-  }, [response?.data])
+  }, [friendProfile?.messages])
 
 
 
@@ -63,10 +60,13 @@ const MessageBox = () => {
       <div className="w-[100%] bg-[#ffff]  h-[10%] flex justify-center rounded-t-[15px] items-center">
         <div className="md:w-[90%] ld:w-[95%] w-[100%] h-[100%] flex justify-between items-center md:border-b-[1px]">
         <div className="lg:w-[50%] ld:w-[65%]  w-[60%] md:w-[50%] flex justify-between items-center h-[80%]">
-          <img className="md:w-[50px] md:h-[50px] h-[40px] ml-1 w-[40px] rounded-full" src={pic} alt="" />
+          <div className="md:w-[50px] flex justify-center items-center md:h-[50px] h-[40px] ml-1 w-[40px] rounded-full">
+          <img  className="w-[80%] h-[80%] rounded-full" src={friendProfile?.profile_image} alt="" />
+          </div>
+
           <div className="w-[75%] flex flex-col justify-center items-start h-[45px]">
-            <h1 className="font-spaceMono w-[100%] truncate text-ellipsis text-gray-800 font-semibold -mt-[1px] text-[18px]">jerry</h1>
-            <p className="font-thin tracking-wide -mt-[4px] text-[13px] md:text-[15px] text-gray-600">Online - Last seen, 2.02pm</p>
+            <h1 className="font-spaceMono w-[100%] truncate text-ellipsis text-gray-800 font-semibold -mt-[1px] text-[18px]">{friendProfile?.username}</h1>
+            <p className="font-thin tracking-wide -mt-[4px] text-[13px] md:text-[15px] text-gray-600">{friendProfile?.is_online === true ? <span className="text-green-500">Online</span> : "Last Seen " + friendProfile?.last_date_online}</p>
           </div>
         </div>
         <div className="md:w-[20%] ld:min-w-[25%] w-[30%] h-[80%] flex justify-between items-center">
@@ -79,14 +79,18 @@ const MessageBox = () => {
       <div
 
        className="w-[100%] h-[90%] pb-[5%]  scroll-smooth relative">
-        <div   className="w-[100%] md:w-[90%] ld:w-[100%] mx-auto  max-h-[100%] relative tab-container overflow-y-auto">
-        <div id="message-container" className="md:w-[100%] ld:w-[100%]  relative ">
-        <Message/>
+        <div  className="w-[100%] md:w-[90%] ld:w-[100%] mx-auto  max-h-[100%] relative tab-container overflow-y-auto">
+        <div ref={messageContainerRef} id="message-container" className="md:w-[100%] ld:w-[100%]  relative ">
+          {
+            friendProfile?.messages?.map((message: messageType) => <Message key={message.message_id} message={message} />)
+          }
+      <div ref={messageBoxRef}  id="padding" className="w-[100%] h-[60px]">
+      </div>
+      </div>
 
-        <div ref={messageBoxRef}  id="padding" className="w-[100%] h-[60px]"></div>
+
       </div>
-      </div>
-      <TextInput boxRef={messageBoxRef.current} />
+      <TextInput  boxRef={messageBoxRef.current} />
       </div>
 
     </div>

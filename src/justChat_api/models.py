@@ -38,7 +38,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
 
 class Group(models.Model):
-    group_id = models.CharField(primary_key=True, max_length=124, editable=False, null=False, default=str(uuid.uuid4))
+    group_id = models.CharField(primary_key=True, max_length=124, editable=False, null=False, default=uuid.uuid4)
     created_at = models.DateField(auto_now_add=True, editable=False)
     group_name = models.CharField(max_length=120, null=False)
     author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=False, related_name="group")
@@ -47,12 +47,13 @@ class Group(models.Model):
 
 
 class Message(models.Model):
-    message_id = models.CharField(primary_key=True, max_length=124, editable=False, null=False, default=str(uuid.uuid4))
-    created_at = models.DateTimeField(default=datetime.now, null=False, editable=False)
+    message_id = models.CharField(primary_key=True, max_length=124, editable=False, null=False)
+    created_at = models.DateTimeField(null=False, editable=False)
     text = models.TextField(null=True, blank=True)
     image = models.TextField(null=True, blank=True)
     video = models.TextField(null=True, blank=True)
     audio = models.TextField(null=True, blank=True)
+    file = models.TextField(null=True, blank=True)
     sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="messages")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True, related_name="messages")
     receipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True, related_name="inbox")

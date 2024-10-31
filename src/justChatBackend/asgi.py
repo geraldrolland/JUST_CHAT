@@ -8,29 +8,30 @@ https://docs.djangoproject.com/en/5.0/howto/deployment/asgi/
 """
 
 import os
-
 from django.core.asgi import get_asgi_application
 
+# Set up the environment for Django settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'justChatBackend.settings')
-from justChat_api.customemiddleware import JWTAuthMiddleware
-from channels.auth import AuthMiddlewareStack
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.security.websocket import AllowedHostsOriginValidator
-from django.core.asgi import get_asgi_application
-# Initialize Django ASGI application early to ensure the AppRegistry
-# is populated before importing code that may import ORM models.
+
+# Initialize Django ASGI application early to ensure the AppRegistry is populated
 django_asgi_app = get_asgi_application()
 
+# Import middleware and channels routing only after initializing Django ASGI application
+from justChat_api.customemiddleware import JWTAuthMiddleware
+from channels.auth import AuthMiddlewareStack
+from channels.security.websocket import AllowedHostsOriginValidator
+from channels.routing import ProtocolTypeRouter, URLRouter
 from justChat_api.routing import websocket_urlpatterns
 
+# Define the ASGI application
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
-            JWTAuthMiddleware( 
-                AuthMiddlewareStack( URLRouter(websocket_urlpatterns)
-                )
-                )
+            AuthMiddlewareStack(
+                URLRouter(websocket_urlpatterns)
+            )
         ),
     }
 )
+

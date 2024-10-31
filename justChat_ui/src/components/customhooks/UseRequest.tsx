@@ -19,28 +19,21 @@ type  userStatusType = {
  * @param {boolean} - the enable parameter provides conditional instances in which UseRequest either execute a fetch request onmount of given component or not
  * @returns {object} - the useRequest hook return an object after execution which contains the response data from the provided endpoint
  */
-const UseRequest = (url :string, method: string = "get", key: null | string = null, enabled: boolean = true) => {
-    const navigateToLogin = useNavigate()
-    console.log("error")
-    if (url && method === "get") {
-        console.log("error1")
+const UseRequest = (url: string, key: string | null = null, enabled: boolean = true) => {
+    const navigateToLogin = useNavigate();
     const fetchFunc = async () => {
+        console.log("errror in userequest")
         try {
-            console.log("error2")
-            const userStatus: userStatusType = JSON.parse(sessionStorage.getItem("userProfile")!)
+            const userStatus: userStatusType = JSON.parse(sessionStorage.getItem("userProfile")!);
             let config = {
-                headers: {
-                    Authorization: "Bearer " + userStatus.access
-                }
-            }
-            console.log("fetching data")
+                headers: { Authorization: "Bearer " + userStatus.access },
+            };
             const response = await axios.get(url, config);
             if (response.status === 200 || response.status === 201) {
-                console.log(response.data)
+                console.log("url", url)
                 return response.data;
             }
         } catch (error: any) {
-            console.log(error.response.status)
             if (error.response && error.response.status === 401) {
                 const userStatus: userStatusType = JSON.parse(sessionStorage.getItem("userProfile")!);
                 if (userStatus && userStatus.refresh) {
@@ -50,18 +43,17 @@ const UseRequest = (url :string, method: string = "get", key: null | string = nu
                             userStatus.access = refreshResponse.data.access;
                             sessionStorage.setItem("userProfile", JSON.stringify(userStatus));
                             const config = {
-                                headers: {
-                                    Authorization: "Bearer " + userStatus.access,
-                                },
+                                headers: { Authorization: "Bearer " + userStatus.access },
                             };
                             const retryResponse = await axios.get(url, config);
                             if (retryResponse.status === 200) {
-                                console.log(retryResponse.data)
                                 return retryResponse.data;
+                            } else {
+                                throw new Error ("failed to refresh token")
                             }
                         }
-                    } catch (refreshError) {
-                        navigateToLogin("/log-in/")
+                    } catch {
+                        navigateToLogin("/log-in/");
                         throw new Error("Failed to refresh token.");
                     }
                 }
@@ -71,22 +63,15 @@ const UseRequest = (url :string, method: string = "get", key: null | string = nu
         }
     };
 
-
     const queryResult = useQuery({
         queryKey: [key],
         queryFn: fetchFunc,
-        initialData: () => {
-            const data = queryClient.getQueryData([key])
-            if (data) {
-                return data
-            }
-        },
+        initialData: () => queryClient.getQueryData([key]),
         enabled,
-        refetchInterval: 1000,
+        refetchInterval: 5000,
     });
 
     return queryResult;
-    }
 };
 
-export default UseRequest
+export default UseRequest;

@@ -430,7 +430,7 @@ class UserViewSet(viewsets.ViewSet):
                     "is_online": friend.is_online,
                     "last_date_online": friend.last_date_online,
                     "last_message":  {
-                        "message_id": user_and_friend_last_msg.messageId,
+                        "message_id": user_and_friend_last_msg.message_id,
                         "sender_username": user_and_friend_last_msg.sender.username,
                         "sender_id": user_and_friend_last_msg.sender.id,
                         "image": user_and_friend_last_msg.image if user_and_friend_last_msg.image else None,
@@ -487,6 +487,53 @@ class UserViewSet(viewsets.ViewSet):
                 group_list.append(group_obj)
             return Response(group_list, status=status.HTTP_200_OK)
         return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+
+
+    @action(detail=True, permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, SessionAuthentication, BasicAuthentication], methods=["post"])
+    def send_message_to_friend(self, request, pk=None):
+        """
+        This endpoint allows user to send message to friend
+        Args:
+            self (object): this parameter is the instance of the class
+            request (object): this parameter is the request object and contains the data about the request
+            pk (int | str): this paramter is the id of the friend
+        Return:
+            Response: request accepted with a status code of 200
+        Raises:
+            Not Found: resource not found with a status code of 404
+
+        """
+
+        friend = get_object_or_404(CustomUser, id=pk)
+        user = get_object_or_404(CustomUser, email=request.user.email)
+        message = request.data
+        message["created_at"] = datetime.strptime(message.get("created_at"), '%m/%d/%Y, %I:%M:%S %p')
+        print(message)
+        message["sender"] = user
+        message["receipient"] = friend
+        print(type(user))
+        print("thi is the error ", user)
+        message_obj = Message.objects.create(**message)
+        friend_channel_name = cache.get(friend.id)
+        print("before save")
+        if friend_channel_name is not None:
+            message_obj.is_receipient_online = True
+            message.update({"message_id":message_obj.message_id, "created_at": FormatDate.format_date(message_obj.created_at)})
+            message_obj.save()
+            message["sender"] = user.id
+            message["receipient"] = friend.id
+            async_to_sync(channel_layer.send)(friend_channel_name,{
+                "type": "send.message.to.friend",
+                "message": message
+            })
+        else:
+            message.update({"message_id":message_obj.message_id, "created_at": FormatDate.format_date(message_obj.created_at), "is_receipient_online": message_obj.is_receipient_online})
+            message_obj.save()
+        message["sender"] = user.id
+        message["receipient"] = friend.id
+        print(type(message))
+        return Response(message, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], authentication_classes=[JWTAuthentication, BasicAuthentication, SessionAuthentication])
     def get_user_and_frnd_msgs(self, request, pk=None):

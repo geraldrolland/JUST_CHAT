@@ -28,9 +28,10 @@ class CustomUserSerializer(ModelSerializer):
         return instance
 
 class GroupSerialzer(ModelSerializer):
-    model = Group
+
 
     class Meta:
+        model = Group
         fields = "__all__"
 
 class IsGroupAdminSerialzer(ModelSerializer):
@@ -41,9 +42,10 @@ class IsGroupAdminSerialzer(ModelSerializer):
 
 
 class MessageSerialzer(ModelSerializer):
-    model = Message
+
 
     class Meta:
+        model = Message
         fields = "__all__"
 
 class AuthSerializer(Serializer):

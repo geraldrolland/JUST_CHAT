@@ -9,15 +9,26 @@ import OtpVarification from './components/OtpVarification'
 import ChangePassword from './components/ChangePassword'
 import Home from './components/Home'
 import MessageBox from './components/MessageBox'
+import useStore from './components/customhooks/UseStore'
 
 export const queryClient = new QueryClient()
 function App() {
-
+  const messageWebsocket = useStore(state =>  state.messageWebsocket)
   useEffect(() => {
     document.body.classList.add("bg-gray-[#F5EFFF]")
     document.body.classList.add("overflow-x-hidden")
+    addEventListener("beforeunload", () => {
+      messageWebsocket?.close()
+      console.log("websocket closed")
+    })
+
+    return () => {
+      removeEventListener("beforeunload", () => {
+        messageWebsocket?.close()
+      })
+    }
     
-  }, [])
+  }, [messageWebsocket])
 
   return (
     <>

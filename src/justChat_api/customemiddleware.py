@@ -59,6 +59,7 @@ from channels.db import database_sync_to_async
 import jwt
 from django.conf import settings
 from .models import CustomUser
+
 @database_sync_to_async
 def get_user_from_token(token):
     try:

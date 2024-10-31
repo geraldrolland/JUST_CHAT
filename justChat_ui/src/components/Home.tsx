@@ -34,7 +34,7 @@ type friendType = {
 }
 export const hideContext = React.createContext<hideContextType>(null!)
 const Home = () => {
-  const response = UseRequest("http://127.0.0.1:8000/api/users/get_friends/", "get", "friends")
+  const response = UseRequest("http://127.0.0.1:8000/api/users/get_friends/",  "friends")
   const showMessgaeBox = () => {
     const messageBox = document.getElementById("message-box")
     messageBox?.classList.add("z-30")
@@ -50,7 +50,22 @@ const Home = () => {
   useEffect(() => {
     console.log("mounted")
     console.log("this response", response?.data)
-  })
+    const userStatus = JSON.parse(sessionStorage.getItem("userProfile")!)
+    const token = userStatus.access
+    
+    const isUserOnlineWebsocket = new WebSocket(`ws://127.0.0.1:8000/ws/isuseronline/?access=${token}`)
+    isUserOnlineWebsocket.onopen = () => {
+      console.log("user connected succcessfully")
+    }
+
+    isUserOnlineWebsocket.onerror = () => {
+      console.log("something went wrong")
+    }
+
+    isUserOnlineWebsocket.onclose = () => {
+      console.log("user disconnected successfully")
+    }
+  }, [])
   return (
     <div className="lg:w-[1100px] w-screen   lg:shadow-md bg-opacity-50 backdrop-filter backdrop-blur-lg h-screen lg:h-[610px] flex justify-center items-center bg-[#BCF2F6] md:rounded-md">
    <div className="lg:w-[95%] lg:h-[95%] relative  w-[100%] h-[100%] flex justify-evenly items-center">

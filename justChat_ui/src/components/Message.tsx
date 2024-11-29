@@ -10,6 +10,7 @@ type messageType = {
   file: string | null,
   sender?: string | number,
   receipient?: string | number,
+  is_receipient_online: boolean,
 
 }
 
@@ -62,13 +63,21 @@ const Message = ({message}: propType) => {
         textParaRef.current.classList.add("bg-purple-600")
         textParaRef.current.classList.remove("text-gray-700")
         textParaRef.current.classList.add("text-white")
-        
+        if (message.is_receipient_online === false) {
+          purpleDotRef.current.classList.remove("bg-purple-500")
+          purpleDotRef.current.classList.add("border-purple-500")
+          purpleDotRef.current.classList.add("border")
+        } else {
+          purpleDotRef.current.classList.add("bg-purple-500")
+          purpleDotRef.current.classList.remove("border-purple-500")
+          purpleDotRef.current.classList.remove("border")     
+        }
 
 
       } else {
         purpleDotRef.current.classList.add("hidden")
       }
-    }, [])
+    }, [message.is_receipient_online])
 
 
   return (

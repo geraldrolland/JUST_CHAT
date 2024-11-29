@@ -1,10 +1,29 @@
 import { useQuery } from "@tanstack/react-query"
 import dog from "../assets/images/dog_avatar.png"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef} from "react"
 import { NavigateFunction, useNavigate } from "react-router"
 import axios from "axios"
-import { queryClient } from "@/App"
+import { queryClient } from "@/main"
 import useStore from "./customhooks/UseStore"
+import { easeIn, useAnimate } from "framer-motion"
+import { transition } from "@cloudinary/url-gen/actions/effect"
+
+
+type messageType = {
+    text: string,
+    message_id: string,
+    created_at: string,
+    audio: string | null,
+    image: string | null,
+    video: string | null,
+    file: string | null,
+    sender?: string | number,
+    receipient?: string | number,
+    is_receipient_online: boolean,
+  
+  }
+
+
 
 type  userStatusType = {
     id: string | number,
@@ -66,7 +85,7 @@ type propType = {
         is_online: boolean,
         last_date_online: string,
         last_message: {
-             message_id: string | number,
+            message_id: string | number,
             sender_username: string,
             sender_id: string | number,
             image: string | null,
@@ -82,17 +101,24 @@ type propType = {
 
 
 const Friend = ({showMessageBox, friend}: propType) => {
+    const [scope, animate] = useAnimate()
     const navigateToChat = useNavigate()
+    const setMessageWebsocket = useStore(state => state.setMessageWebsocket)
+    const currentPath = useStore(state => state.currentPath)
     const imgRef = useRef<HTMLImageElement>(null!)
     const navigateToLogin = useNavigate();
+    const friendProfile = useStore(state => state.friendProfile) 
     const setFriendProfile = useStore(state => state.setFriendProfile)
-    const {data: messages} = useQuery({
+    const scrollToLastMsg = useStore(state => state.scrollToLastMsg)!
+    const paraRef = useRef<HTMLParagraphElement>(null!)
+    const {data: messages, isSuccess} = useQuery({
         queryKey: ["messages", friend.id],
         queryFn: () => fetchFunc(`http://127.0.0.1:8000/api/users/${friend.id}/get_user_and_frnd_msgs/`, navigateToLogin),
-        initialData: () => queryClient.getQueryData(["messages", friend.id]),
-        refetchInterval: false,
+       // initialData: () => queryClient.getQueryData(["messages", friend.id]),
+        refetchInterval: 2500,
+        cacheTime: 0,
+        staleTime: 0,
     });
-
 
     const navigateToMessageChatBox = () => {
     navigateToChat(`/home/friend/${friend.id}`)
@@ -106,21 +132,38 @@ const Friend = ({showMessageBox, friend}: propType) => {
         messages: messages ? messages : [],
     }
     setFriendProfile(profile)
-    console.log("profie", profile.messages)
-
+    console.log("PROFILE MESSAGES", profile.messages)
     }
 
-
+    const showIsTyping = () => {
+        paraRef.current.classList.add("hidden")
+        scope.current.classList.remove("hidden")
+        animate(scope.current, {
+            opacity: [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            transition: {
+                duration: 5,
+                easeIn: "easeIn"
+            }
+        })
+        setTimeout(() => {
+            paraRef.current.classList.remove("hidden")
+            scope.current.classList.add("hidden")
+        }, 5000)
+    }
 
     useEffect(() => {
         const userStatus = JSON.parse(sessionStorage.getItem("userProfile")!)
         const access = userStatus.access
         if (friend.profile_image === null) {
             if (friend.is_online === true) {
+                imgRef.current.classList.remove("filter")
+                imgRef.current.classList.remove("grayscale")
                 imgRef.current.classList.add("filter")
                 imgRef.current.classList.add("drop-shadow-md")
             } 
             else {
+                imgRef.current.classList.remove("filter")
+                imgRef.current.classList.remove("drop-shadow-md")
                 imgRef.current.classList.add("filter")
                 imgRef.current.classList.add("grayscale")
             }
@@ -128,8 +171,7 @@ const Friend = ({showMessageBox, friend}: propType) => {
 
 
         if (friend.id) {
-            const messageWebsocket = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${friend.id}/?access=${access}`);
-          
+          const messageWebsocket = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${friend.id}/?access=${access}`);
           messageWebsocket.onopen = () => {
           console.log("connected successfully")
           }
@@ -142,33 +184,63 @@ const Friend = ({showMessageBox, friend}: propType) => {
             console.log("message", e.data)
             const message = JSON.parse(e.data)
             if (message) {
-              messages.push(message.message)
+                if (Object.getOwnPropertyDescriptor(message, "isTyping")) {
+                    if (message.sender === friend.id) {
+                        console.log("is typing")
+                        showIsTyping()
+                    }
+                } else {
+                    console.log(currentPath)
+                    if (message.sender === friend.id && currentPath === `/home/friend/${friend.id}`) {
+                        console.log("SENDER")
+                        console.log(currentPath)
+                        const updatedMessages: messageType[]  = [...friendProfile?.messages!, message]
+                        useStore.setState({friendProfile: {
+                        friend_id: friend.id,
+                        username: friend.username,
+                        profile_image: friend.profile_image,
+                        is_online: friend.is_online,
+                        last_date_online: friend.last_date_online,
+                        messages: updatedMessages,
+                       }})
+                       console.log("THIS IS UPDATE MESSAGES", updatedMessages)
+                       scrollToLastMsg();
+                    }
+
+                }
+
             }
-          }
-    
-          messageWebsocket.onclose = () => {
-            console.log("connection closed successfully")
-          }
-
         }
-
-
+        messageWebsocket.onclose = () => {
+        console.log("connection closed successfully")
+        }
+        setMessageWebsocket(messageWebsocket)
+        }
         console.log("username and id ", friend.username, friend.id)
-    }, [friend.is_online])
+    }, [friend.is_online, messages])
 
     useEffect(() => {
-        const profile  = {
-            friend_id: friend.id,
-            username: friend.username,
-            profile_image: friend.profile_image ? friend.profile_image : dog,
-            is_online: friend.is_online,
-            last_date_online: friend.last_date_online ? friend.last_date_online : null,
-            messages,
-        }
-        setFriendProfile(profile)
-        console.log(messages)
+        if (isSuccess) {
+            console.log("MY CURRENT PATH", currentPath)
+            if (currentPath === `/home/friend/${friend.id}`)
+            {
+              /*  useStore.setState({friendProfile: {
+                    friend_id: friend.id,
+                    username: friend.username,
+                    profile_image: friend.profile_image,
+                    is_online: friend.is_online,
+                    last_date_online: friend.last_date_online,
+                    messages: messages,
+
+                }})*/
+               navigateToMessageChatBox()
+            }
+
+            console.log(messages)
+        }        
+
     }, 
-    [messages])
+    [isSuccess, friend.is_online, messages])
 
   return (
     <div onClick={navigateToMessageChatBox} id={friend.id} className="w-[100%] ld:last:mb-[40px] last:mb-[80px] cursor-pointer h-[60px] border-b-[1px]  transform scale-95 flex justify-between items-center">
@@ -181,7 +253,8 @@ const Friend = ({showMessageBox, friend}: propType) => {
 
             <div className="w-[70%] h-[40px] pl-1 flex flex-col justify-center text-gray-700  items-start ">
                 <h1 className="font-spaceMono tracking-tighter font-semibold truncate">{friend.username}</h1>
-                <p className="font-muli text-gray-900 truncate text-[14px] font-thin">{friend.last_message?.text}</p>
+                <p ref={scope} className="text-[14px] hidden font-thin text-gray-800 italic">typing ...</p>
+                <p ref={paraRef} className="font-muli w-[90%] text-gray-900 truncate text-[14px] font-thin">{friend.last_message?.text}</p>
             </div>
         </div>
         <div className="w-[30%] relative h-[40px]">

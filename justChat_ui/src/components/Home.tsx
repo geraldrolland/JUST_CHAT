@@ -10,6 +10,8 @@ import Friend from "./Friend";
 import { Outlet } from "react-router";
 import React, { useEffect } from "react";
 import UseRequest from "./customhooks/UseRequest";
+import { useContext } from "react";
+import { logoutContext } from "@/App";
 type hideContextType = {
   hideMessageBox: () => void,
 }
@@ -34,6 +36,7 @@ type friendType = {
 }
 export const hideContext = React.createContext<hideContextType>(null!)
 const Home = () => {
+  const {mutate} = useContext(logoutContext)
   const response = UseRequest("http://127.0.0.1:8000/api/users/get_friends/",  "friends")
   const showMessgaeBox = () => {
     const messageBox = document.getElementById("message-box")
@@ -45,6 +48,11 @@ const Home = () => {
     const messageBox = document.getElementById("message-box")
     messageBox?.classList.remove("z-30")
     messageBox?.classList.add("-z-10")
+  }
+
+  const logoutUser = () => {
+    console.log("log out")
+    mutate()
   }
 
   useEffect(() => {
@@ -85,10 +93,10 @@ const Home = () => {
         <IoSettingsOutline className="text-gray-200 text-[30px]" />
         </div>
         <div className="w-[70px] h-[70px] flex justify-center  ld:hidden items-center">
-        <IoLogOutOutline className="text-gray-200 text-[30px]" />
+        <IoLogOutOutline  className="text-gray-200 text-[30px]" />
         </div>
       </div>
-      <div className="w-[70px] h-[70px] hidden ld:flex justify-center   items-center">
+      <div onClick={logoutUser} className="w-[70px] h-[70px] hidden ld:flex justify-center   items-center">
         <IoLogOutOutline className="text-gray-200 text-[30px]" />
       </div>
     </div>

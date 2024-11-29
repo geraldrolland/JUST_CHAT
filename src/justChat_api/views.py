@@ -420,15 +420,12 @@ class UserViewSet(viewsets.ViewSet):
             for friend in user_friends:
                 user_and_friend_msg = Message.objects.filter(Q(sender=user.id, receipient=friend.id) | Q(sender=friend.id, receipient=user.id)).order_by("created_at")
                 user_and_friend_last_msg = user_and_friend_msg[len(user_and_friend_msg) - 1] if user_and_friend_msg else None
-                if user_and_friend_last_msg is not None:
-                    user_and_friend_last_msg.is_receipient_online = True if user_and_friend_last_msg.receipient.id == friend.id and friend.is_online == True else False
-                    user_and_friend_last_msg.save()
                 friend_obj = {
                     "id": friend.id,
                     "username": friend.username,
                     "profile_image": friend.profile_image if friend.profile_image else None,
                     "is_online": friend.is_online,
-                    "last_date_online": friend.last_date_online,
+                    "last_date_online": FormatDate.format_date(friend.last_date_online) if friend.last_date_online else None,
                     "last_message":  {
                         "message_id": user_and_friend_last_msg.message_id,
                         "sender_username": user_and_friend_last_msg.sender.username,
@@ -513,14 +510,14 @@ class UserViewSet(viewsets.ViewSet):
         message["sender"] = user
         message["receipient"] = friend
         print(type(user))
-        print("thi is the error ", user)
         message_obj = Message.objects.create(**message)
-        friend_channel_name = cache.get(friend.id)
-        print("before save")
+        friend_channel_name = cache.get(friend.id, default=None)
         if friend_channel_name is not None:
-            message_obj.is_receipient_online = True
-            message.update({"message_id":message_obj.message_id, "created_at": FormatDate.format_date(message_obj.created_at)})
+            if friend.is_online:
+                message_obj.is_receipient_online = True
+            message.update({"message_id":message_obj.message_id, "created_at": FormatDate.format_date(message_obj.created_at), "is_receipient_online": message_obj.is_receipient_online})
             message_obj.save()
+            print("MESSAGE IS ONLINE", message["is_receipient_online"])
             message["sender"] = user.id
             message["receipient"] = friend.id
             async_to_sync(channel_layer.send)(friend_channel_name,{
@@ -552,16 +549,16 @@ class UserViewSet(viewsets.ViewSet):
             Not Found: resource not found with status code of 404
 
         """
-        print("this is ")
         friend = get_object_or_404(CustomUser, id=pk)
         user = get_object_or_404(CustomUser, email=request.user.email)
         messages = Message.objects.filter(Q(sender=friend.id, receipient=user.id) | Q(sender=user.id, receipient=friend.id)).order_by("created_at")
         if messages:
             message_list = []
             for message in messages:
-                if message.receipient == user.id:
-                    message.is_receipient_online = True
-                    message.save()
+                if message.receipient.id == user.id:
+                    if message.is_receipient_online == False:
+                        message.is_receipient_online = True
+                        message.save()
                 message_obj = {
                     "message_id": message.message_id,
                     "image": message.image if message.image else None,
@@ -617,6 +614,17 @@ class UserViewSet(viewsets.ViewSet):
             return Response(group_message_list, status=status.HTTP_200_OK)
         return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
     
+    @action(detail=False, permission_classes=[IsAuthenticated], authentication_classes=[BasicAuthentication, JWTAuthentication, SessionAuthentication], methods=["post"])
+    def logout_user(self, request):
+        user = get_object_or_404(CustomUser, email=request.user.email)
+        user.channel_name = None
+        user.last_date_online = datetime.now().isoformat()
+        user.is_online = False
+        user.save()
+        print("logged out")
+        return Response({"detail": "logged out succesfully"}, status=status.HTTP_200_OK)
+
+
     @action(detail=False, permission_classes=[AllowAny], methods=["get"])
     def check_limit(self, request):
         return Response({"detail": "ok"}, status=status.HTTP_200_OK)

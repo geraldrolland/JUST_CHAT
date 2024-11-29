@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { queryClient } from '../../App';
+import { queryClient } from '@/main';
 import { useNavigate } from 'react-router-dom';
 
 type  userStatusType = {
@@ -68,6 +68,7 @@ const UseRequest = (url: string, key: string | null = null, enabled: boolean = t
         queryFn: fetchFunc,
         initialData: () => queryClient.getQueryData([key]),
         enabled,
+        cacheTime: 0,
         refetchInterval: 5000,
     });
 

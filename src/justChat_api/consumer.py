@@ -24,6 +24,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except (jwt.ExpiredSignatureError, KeyError, jwt.DecodeError, CustomUser.DoesNotExist):
             await self.close(code=1006)
 
+    async def receive(self, text_data=None):
+        message = json.loads(text_data)
+        if message["isTyping"] == True:
+            friend_channel_name = cache.get(message["receipient"], default=None)
+            if friend_channel_name is not None:
+                await self.channel_layer.send(
+                    friend_channel_name, {
+                        "type": "send.message.to.friend",
+                        "message": message,
+                    }
+                )
+    
     async def send_message_to_friend(self, event):
         message = event["message"]
         await self.send(text_data=json.dumps(message))

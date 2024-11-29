@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router"
+import { useLocation, useNavigate, useParams } from "react-router"
 import { useContext, useEffect} from "react"
 import { hideContext } from "./Home"
 
@@ -23,9 +23,11 @@ type messageType = {
   file: string | null,
   sender?: string | number,
   receipient?: string | number,
+  is_receipient_online: boolean,
 
 }
 const MessageBox = () => {
+  const currentLocation = useLocation()
   const setScrollToLastMsg = useStore(state => state.setScrollToLastMsg)
   const messageBoxRef = useRef<HTMLDivElement>(null!)
   const navigateToHome = useNavigate()
@@ -42,17 +44,20 @@ const MessageBox = () => {
   const navigateHome = () => {
     navigateToHome("/home")
     hideMessageBox()
+    useStore.setState({currentPath: ""})
   }
 
   useEffect(() => {
-
     messageContainerRef.current.scrollIntoView({behavior:"smooth", block:"end"})
     console.log("params", params.userId)
     console.log("message", friendProfile?.messages)
-    setScrollToLastMsg(scrollToLastMsg)
-
+    setScrollToLastMsg(scrollToLastMsg) 
   }, [friendProfile?.messages])
 
+  useEffect(() => {
+    console.log("THIS IS THE PATH ", currentLocation.pathname)
+    useStore.setState({currentPath: currentLocation.pathname})   
+  }, [])
 
 
   return (
@@ -66,7 +71,7 @@ const MessageBox = () => {
 
           <div className="w-[75%] flex flex-col justify-center items-start h-[45px]">
             <h1 className="font-spaceMono w-[100%] truncate text-ellipsis text-gray-800 font-semibold -mt-[1px] text-[18px]">{friendProfile?.username}</h1>
-            <p className="font-thin tracking-wide -mt-[4px] text-[13px] md:text-[15px] text-gray-600">{friendProfile?.is_online === true ? <span className="text-green-500">Online</span> : "Last Seen " + friendProfile?.last_date_online}</p>
+            <p className="font-thin tracking-wide -mt-[4px] text-[13px] md:text-[15px] text-gray-600">{friendProfile?.is_online === true ? <span className="text-green-500">Online</span> : <span className="text-[14px]">Last Seen  {friendProfile?.last_date_online}</span>}</p>
           </div>
         </div>
         <div className="md:w-[20%] ld:min-w-[25%] w-[30%] h-[80%] flex justify-between items-center">
@@ -87,8 +92,6 @@ const MessageBox = () => {
       <div ref={messageBoxRef}  id="padding" className="w-[100%] h-[60px]">
       </div>
       </div>
-
-
       </div>
       <TextInput  boxRef={messageBoxRef.current} />
       </div>

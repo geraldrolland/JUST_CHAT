@@ -25,6 +25,7 @@ type friendProfileType = {
 }
 
 type stateType = {
+    currentPath: string | null,
     messageWebsocket: null | WebSocket,
     isPasswordChanged: boolean,
     friendProfile: friendProfileType | null,
@@ -37,6 +38,7 @@ type stateType = {
   }
   
   const useStore = create<stateType>()(immer((set) => ({
+    currentPath: null,
     messageWebsocket: null,
     isPasswordChanged: false,
     scrollToLastMsg: null as (() => void) | null,

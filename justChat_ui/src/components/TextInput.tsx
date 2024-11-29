@@ -10,6 +10,10 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { useNavigate } from "react-router";
+import { Cloudinary } from '@cloudinary/url-gen';
+import { auto } from '@cloudinary/url-gen/actions/resize';
+import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity';
+import { none } from "@cloudinary/url-gen/qualifiers/fontHinting";
 type propType ={
   boxRef: HTMLDivElement,
 
@@ -81,6 +85,14 @@ const fetchFunc = async (url: string, data: messageType,  navigateToLogin: any) 
 };
 
 const TextInput = ({boxRef}: propType) => {
+  const uploadFileToCloudinary = new Cloudinary({
+    cloud: {
+      cloudName: "djoio0z7a",
+      
+    }
+  })
+
+  const textAreaRef = useRef<HTMLTextAreaElement>(null!)
 
   const [message, setMessage] = useState<messageType>({
     text: "",
@@ -98,45 +110,77 @@ const TextInput = ({boxRef}: propType) => {
   const sendRef = useRef<HTMLButtonElement>(null!)
   const micRef = useRef<HTMLButtonElement>(null!)
   const smileCamRef = useRef<HTMLDivElement>(null!)
-  const friendProfile = useStore(state => state.friendProfile)
+  const friendProfile = useStore(state => state.friendProfile)!
   const scrollToLastMsg = useStore(state => state.scrollToLastMsg!)
   const navigateToLogin = useNavigate()
+  const messageWebsocket = useStore(state => state.messageWebsocket)
 
   const sendMessage = useMutation({
     mutationFn: () => fetchFunc(`http://127.0.0.1:8000/api/users/${friendProfile?.friend_id}/send_message_to_friend/`, message, navigateToLogin),
     onMutate: () => {
-      setMessage({...message, created_at: new Date().toLocaleString(), message_id: crypto.randomUUID()});
-      const msg = Object.assign({}, message);
-      msg.created_at = "sending ...";
+      
+      const msg = {
+        message_id: crypto.randomUUID(),
+        text: message.text,
+        created_at: "sending ...",
+        audio: message.audio,
+        image: message.image,
+        video: message.video,
+        file: message.file,
+        sender: message.sender,
+        receipient: message.receipient,
+        is_receipient_online: false,
+      }
+
+      setMessage({...message, created_at: new Date().toLocaleString(), message_id: msg.message_id});
       console.log("this is the push message ", msg)
       console.log("this is the sent message", message)
       const messages = [...friendProfile?.messages!, msg]
       useStore.setState({friendProfile: {friend_id: friendProfile?.friend_id, username: friendProfile?.username, profile_image: friendProfile?.profile_image, is_online: friendProfile?.is_online!, last_date_online: friendProfile?.last_date_online!, messages: messages}})
       console.log("message", msg)
       scrollToLastMsg();
+      textAreaRef.current.value = "";
+      textAreaRef.current.style.height = "auto"
     },
 
     onSuccess: (data) => {
       console.log("it returned", data)
-      friendProfile?.messages?.forEach((msg) => {
-        console.log("it is iterating")
-        console.log(msg)
-        if (msg.message_id === data.message_id) {
-          console.log("this is the returned mesage ", data)
-          msg.created_at = data.created_at;
-          msg.is_receipient_online = data.is_receipient_online;
-          return;
-        }
-
-      })
+      let updatedMessages = friendProfile?.messages?.filter(msg => msg.message_id !== data.message_id)
+      updatedMessages?.push(data)
+      console.log("THIS IS THE RETURNED DATA ", data)
+      useStore.setState({friendProfile: { 
+        friend_id: friendProfile?.friend_id,
+        username: friendProfile?.username,
+        profile_image: friendProfile?.profile_image,
+        is_online: friendProfile.is_online,
+        last_date_online: friendProfile.last_date_online,
+        messages: updatedMessages ? updatedMessages : [],
+      }})
+      resetMessage();
     },
 
     onError: (error) => {
-      console.log("error", error)
+      console.log("error", error);
     }
   })
+
+
+  const resetMessage = () => {
+    setMessage({...message, text:"", audio: null, file: null, image: null, video: null})
+
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter") {
+        sendRef.current?.click();
+        console.log("This is the Enter key");
+        e.preventDefault(); // Prevents a new line from being added
+    }
+};
+
   const expandInputHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     console.log(e.target.offsetHeight)
+
     e.target.style.height = "auto"
     if (e.target.scrollHeight > 120 || e.target.scrollHeight === 120) {
       boxRef.style.height = "120px"
@@ -145,11 +189,17 @@ const TextInput = ({boxRef}: propType) => {
 
     if (e.target.scrollHeight > 45 && e.target.scrollHeight < 120) {
       console.log("scroll height", e.target.scrollHeight )
-      boxRef.style.height = `${e.target.scrollHeight}px`
+      //boxRef.style.height = `${e.target.scrollHeight}px`
       e.target.style.height = `${e.target.scrollHeight}px`
     }
 
     if (e.target.value.trim() !== "") {
+      const userProfile = JSON.parse(sessionStorage.getItem("userProfile")!)
+      const typing = JSON.stringify({isTyping: true, sender: userProfile.id, receipient: friendProfile?.friend_id })
+      if (messageWebsocket?.OPEN === 1) {
+        messageWebsocket?.send(typing)
+        console.log("this is the typing message", typing)
+      }
       micRef.current.classList.remove("flex")
       micRef.current.classList.add("hidden")
       sendRef.current.classList.remove("hidden")
@@ -169,8 +219,14 @@ const TextInput = ({boxRef}: propType) => {
   }
 
   const sendmsg = () => {
-    console.log("this is it")
-    sendMessage.mutate()
+    if (message.text.trim() !== "" || message.audio !== null || message.video !== null) {
+      console.log("this is it")
+      console.log("COL1")
+      sendMessage.mutate()
+      console.log("COL1")
+    }
+
+
   }
 
   useEffect(() => {
@@ -185,7 +241,7 @@ const TextInput = ({boxRef}: propType) => {
         <div className="absolute left-0 bottom-[14px] w-[30px] h-[30px] pt-1  justify-end pl-1 items-center">
           <GiPaperClip className="text-gray-700 text-[25px]" />
         </div>
-        <textarea onChange={(e) => expandInputHeight(e)} className="w-[100%] tab-container text-gray-700 rounded-md resize-none pr-8 focus:outline-none bg-blue-100  pl-10  " cols={1} name="" id="" placeholder="enter message"></textarea>
+        <textarea ref={textAreaRef} onKeyDown={(e) => handleKeyDown(e)} onChange={(e) => expandInputHeight(e)} className="w-[100%] tab-container text-gray-700 rounded-md resize-none pr-8 focus:outline-none bg-blue-100  pl-10  " cols={1} name="" id="" placeholder="enter message"></textarea>
         <div ref={smileCamRef} className="absolute right-0 bottom-[14px] w-[70px] h-[30px] flex transform transition-all duration-300 justify-center items-center">
           <div className="w-[50%] h-[100%] flex justify-center items-center">
             <CiFaceSmile className="text-gray-700 text-[25px]" />
